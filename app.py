@@ -394,6 +394,14 @@ async def protected_resource(request: Request):
             "authorization_servers": [base],
             "bearer_methods_supported": ["header"]}
 
+@app.get("/.well-known/oauth-protected-resource/{resource_path:path}")
+async def protected_resource_path(request: Request, resource_path: str):
+    # RFC 9728 path-appended variant, e.g. /.well-known/oauth-protected-resource/mcp
+    base = public_base(request)
+    return {"resource": base + "/" + resource_path,
+            "authorization_servers": [base],
+            "bearer_methods_supported": ["header"]}
+
 @app.get("/.well-known/oauth-authorization-server")
 async def as_metadata(request: Request):
     base = public_base(request)
@@ -407,6 +415,12 @@ async def as_metadata(request: Request):
             "token_endpoint_auth_methods_supported": ["none", "client_secret_basic", "client_secret_post"],
             "code_challenge_methods_supported": ["S256"],
             "scopes_supported": ["openid", "email"]}
+
+@app.get("/.well-known/openid-configuration")
+async def oidc_configuration(request: Request):
+    # Same discovery document as the OAuth AS metadata; some clients probe
+    # the OIDC path first when the "openid" scope is requested.
+    return await as_metadata(request)
 
 @app.post("/register")
 async def register_client(request: Request):
