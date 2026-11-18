@@ -37,7 +37,22 @@ try:
 except OSError:
     pass  # read-only filesystem (e.g. serverless): GATEWAY_DATA_DIR should point to /tmp
 DB_PATH = Path(os.environ.get("GATEWAY_DB", DATA_DIR / "gateway.db"))
-PUBLIC_BASE = os.environ.get("GATEWAY_PUBLIC_BASE", "http://localhost:8000").rstrip("/")
+PUBLIC_BASE_ENV = os.environ.get("GATEWAY_PUBLIC_BASE", "").rstrip("/")
+PUBLIC_BASE = PUBLIC_BASE_ENV or "http://localhost:8000"
+
+
+def public_base(request: Optional[Request] = None) -> str:
+    """Public base URL for OAuth metadata. Explicit env wins; otherwise derive
+    it from the (forwarded) request host so proxied/serverless deployments
+    (e.g. Vercel) advertise their real public URL instead of localhost."""
+    if PUBLIC_BASE_ENV:
+        return PUBLIC_BASE_ENV
+    if request is not None:
+        proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "http").split(",")[0].strip()
+        host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc).split(",")[0].strip()
+        if host:
+            return f"{proto}://{host}".rstrip("/")
+    return PUBLIC_BASE
 
 # ---------------------------------------------------------------- secrets ---
 def _load_secret() -> bytes:
@@ -312,7 +327,7 @@ async def handle_mcp(request: Request, server_slug: Optional[str]):
         return JSONResponse({"jsonrpc": "2.0", "id": None,
                              "error": {"code": -32001, "message": "Unauthorized: Bearer API key or OAuth token required"}},
                             status_code=401,
-                            headers={"WWW-Authenticate": f'Bearer resource_metadata="{PUBLIC_BASE}/.well-known/oauth-protected-resource"'})
+                            headers={"WWW-Authenticate": f'Bearer resource_metadata="{public_base(request)}/.well-known/oauth-protected-resource"'})
     try:
         body = await request.json()
     except Exception:
@@ -373,18 +388,20 @@ async def mcp_get():
 
 # ------------------------------------------------------------------ OAuth --
 @app.get("/.well-known/oauth-protected-resource")
-async def protected_resource():
-    return {"resource": PUBLIC_BASE + "/mcp",
-            "authorization_servers": [PUBLIC_BASE],
+async def protected_resource(request: Request):
+    base = public_base(request)
+    return {"resource": base + "/mcp",
+            "authorization_servers": [base],
             "bearer_methods_supported": ["header"]}
 
 @app.get("/.well-known/oauth-authorization-server")
-async def as_metadata():
-    return {"issuer": PUBLIC_BASE,
-            "authorization_endpoint": PUBLIC_BASE + "/authorize",
-            "token_endpoint": PUBLIC_BASE + "/token",
-            "registration_endpoint": PUBLIC_BASE + "/register",
-            "revocation_endpoint": PUBLIC_BASE + "/revoke",
+async def as_metadata(request: Request):
+    base = public_base(request)
+    return {"issuer": base,
+            "authorization_endpoint": base + "/authorize",
+            "token_endpoint": base + "/token",
+            "registration_endpoint": base + "/register",
+            "revocation_endpoint": base + "/revoke",
             "response_types_supported": ["code"],
             "grant_types_supported": ["authorization_code", "refresh_token"],
             "token_endpoint_auth_methods_supported": ["none", "client_secret_basic", "client_secret_post"],

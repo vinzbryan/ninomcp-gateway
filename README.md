@@ -93,7 +93,7 @@ alur OAuth lengkap dengan PKCE, metadata well-known, dan audit log.
    | `GATEWAY_SECRET` | string acak panjang buatan sendiri (untuk menandatangani sesi) |
    | `GATEWAY_ADMIN_USER` | `admin` |
    | `GATEWAY_ADMIN_PASSWORD` | kata sandi admin dashboard buatan sendiri |
-   | `GATEWAY_PUBLIC_BASE` | URL deployment kamu, mis. `https://ninomcp-gateway.vercel.app` — isi setelah deploy pertama, lalu redeploy sekali agar metadata OAuth benar |
+   | `GATEWAY_PUBLIC_BASE` | *(opsional)* URL deployment kamu, mis. `https://ninomcp-gateway.vercel.app` — bila kosong, alamat publik dideteksi otomatis dari host request (termasuk di Vercel), jadi metadata OAuth tetap benar tanpa redeploy manual |
 
 3. Catatan serverless: database SQLite tinggal di /tmp, jadi data (user, API key,
    upstream, audit) **ter-reset saat instance Vercel berganti/cold start**. Cocok
